@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="نظام إدارة فواتير المياه والخدمات للشقق السكنية - تطبيق موبايل متكامل">
+    <title>نظام إدارة فواتير المياه والخدمات</title>
+    
+    <!-- Dynamic Web App Manifest for Android PWA Installation -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for Interactive Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Cairo & Tajawal for clean Arabic Mobile Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        water: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .glass-header {
+            background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 100%);
+        }
+        .tab-active {
+            background-color: #0284c7;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3);
+        }
+        .nav-item-active {
+            color: #0284c7;
+        }
+        .nav-item-active i {
+            transform: translateY(-2px);
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased select-none sm:select-auto">
+
+    <!-- Toast Notification Container (Replaces alert) -->
+    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-md pointer-events-none"></div>
+
+    <!-- Custom Modal for Confirmations & Image Preview (Replaces confirm) -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl transform transition-all">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                <h3 id="modal-title" class="font-bold text-lg text-slate-800">تنبيه</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div id="modal-body" class="text-slate-600 text-sm mb-5 overflow-auto max-h-[70vh]"></div>
+            <div id="modal-footer" class="flex justify-end gap-2"></div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 1. LOGIN / SETUP SCREEN                                               -->
+    <!-- ===================================================================== -->
+    <div id="auth-screen" class="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-b from-water-900 via-water-800 to-slate-900">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <!-- Header Illustration -->
+            <div class="glass-header p-8 text-center text-white relative overflow-hidden">
+                <div class="w-20 h-20 bg-white/15 backdrop-blur-md rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-inner border border-white/20">
+                    <i class="fas fa-faucet-drip text-4xl text-water-200"></i>
+                </div>
+                <h1 id="auth-app-title" class="text-2xl font-extrabold tracking-wide">نظام فواتير المياه</h1>
+                <p class="text-water-100 text-xs mt-1">إدارة شاملة لفواتير المياه والخدمات للشقق السكنية</p>
+            </div>
+
+            <!-- Auth Form Container -->
+            <div class="p-6 sm:p-8">
+                <!-- First Time Setup Banner (Shown only if no admin credentials exist yet) -->
+                <div id="first-time-banner" class="hidden mb-5 p-3.5 bg-water-50 border border-water-200 rounded-2xl text-xs text-water-800 flex items-start gap-3">
+                    <i class="fas fa-shield-halved text-water-600 text-lg mt-0.5"></i>
+                    <div>
+                        <p class="font-bold mb-0.5">تهيئة النظام لأول مرة</p>
+                        <p class="text-water-700 leading-relaxed">يرجى تعيين اسم المستخدم وكلمة المرور الخاصة بالمدير لحماية بيانات المبنى.</p>
+                    </div>
+                </div>
+
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">اسم المستخدم</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input type="text" id="auth-username" required autocomplete="username"
+                                class="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-water-600 focus:bg-white transition"
+                                placeholder="أدخل اسم المستخدم">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">كلمة المرور</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input type="password" id="auth-password" required autocomplete="current-password"
+                                class="w-full pr-10 pl-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-water-600 focus:bg-white transition"
+                                placeholder="أدخل كلمة المرور">
+                            <button type="button" onclick="togglePasswordVisibility('auth-password')" class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 hover:text-slate-600">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="confirm-password-group" class="hidden">
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">تأكيد كلمة المرور</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                                <i class="fas fa-check-double"></i>
+                            </span>
+                            <input type="password" id="auth-password-confirm"
+                                class="w-full pr-10 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-water-600 focus:bg-white transition"
+                                placeholder="أعد إدخال كلمة المرور">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="auth-submit-btn"
+                        class="w-full py-3.5 bg-water-600 hover:bg-water-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-water-600/30 transition flex items-center justify-center gap-2 text-sm mt-2">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>تسجيل الدخول</span>
+                    </button>
+                </form>
+
+                <!-- Install PWA Banner on Login Screen -->
+                <div id="login-install-box" class="hidden mt-6 pt-5 border-t border-slate-100 text-center">
+                    <button type="button" onclick="triggerPWAInstall()" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
+                        <i class="fab fa-android text-emerald-600 text-base"></i>
+                        <span>تثبيت التطبيق على هاتف أندرويد</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <p class="text-slate-400 text-[11px] mt-6 text-center">يعمل بدون إنترنت • تخزين محلي آمن على جهازك</p>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MAIN APPLICATION SHELL                                                -->
+    <!-- ===================================================================== -->
+    <div id="app-shell" class="hidden min-h-screen flex flex-col pb-20">
+        
+        <!-- Top App Bar -->
+        <header class="glass-header text-white sticky top-0 z-30 shadow-md no-print">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center border border-white/20">
+                        <i class="fas fa-water text-water-200 text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 id="header-building-name" class="font-bold text-base leading-tight">نظام فواتير المياه</h1>
+                        <div class="flex items-center gap-2 text-[11px] text-water-100">
+                            <span id="live-clock">--:--</span>
+                            <span>•</span>
+                            <span id="header-currency-badge" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">ر.ي</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <!-- Quick Install Button if supported -->
+                    <button id="header-install-btn" onclick="triggerPWAInstall()" class="hidden p-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded-xl text-emerald-100 text-xs flex items-center gap-1.5 transition" title="تثبيت التطبيق">
+                        <i class="fab fa-android"></i>
+                        <span class="hidden sm:inline">تثبيت</span>
+                    </button>
+                    <!-- Logout Button -->
+                    <button onclick="logout()" class="p-2.5 bg-white/10 hover:bg-rose-500/80 rounded-xl text-white transition flex items-center gap-1.5 text-xs font-semibold" title="تسجيل الخروج">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span class="hidden sm:inline">خروج</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-5xl w-full mx-auto p-4">
+
+            <!-- ============================================================= -->
+            <!-- VIEW 1: DATA ENTRY (نافذة الإدخال - 4 شرائح)                  -->
+            <!-- ============================================================= -->
+            <section id="view-entry" class="space-y-4">
+                <!-- 4 Sub-tabs Navigation -->
+                <div class="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/70 grid grid-cols-2 sm:grid-cols-4 gap-1.5 no-print">
+                    <button onclick="switchEntryTab('gov')" id="tab-btn-gov" class="tab-active py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>فاتورة حكومية</span>
+                    </button>
+                    <button onclick="switchEntryTab('tanker')" id="tab-btn-tanker" class="text-slate-600 hover:bg-slate-100 py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-truck-droplet"></i>
+                        <span>وايتات المياه</span>
+                    </button>
+                    <button onclick="switchEntryTab('services')" id="tab-btn-services" class="text-slate-600 hover:bg-slate-100 py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-tools"></i>
+                        <span>خدمات أخرى</span>
+                    </button>
+                    <button onclick="switchEntryTab('subscribers')" id="tab-btn-subscribers" class="text-slate-600 hover:bg-slate-100 py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-users"></i>
+                        <span>المشتركين</span>
+                    </button>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- TAB A: شريحة إدخال بيانات فاتورة حكومية                    -->
+                <!-- --------------------------------------------------------- -->
+                <div id="entry-panel-gov" class="space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <span class="w-2 h-6 bg-water-600 rounded-full"></span>
+                                إدخال فاتورة مياه حكومية
+                            </h2>
+                            <span class="text-[11px] text-slate-400">الحقول * مطلوبة</span>
+                        </div>
+
+                        <form id="form-gov" onsubmit="saveGovBill(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الرقم (رقم الفاتورة) *</label>
+                                <input type="text" id="gov-number" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="مثال: 101">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الشهر *</label>
+                                <input type="month" id="gov-month" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">القراءة السابقة *</label>
+                                <input type="number" step="any" id="gov-prev-read" required oninput="calcGovBill()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">القراءة الحالية *</label>
+                                <input type="number" step="any" id="gov-curr-read" required oninput="calcGovBill()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-water-700 mb-1">عدد الوحدات (آلي)</label>
+                                <input type="number" step="any" id="gov-units" readonly class="w-full px-3 py-2.5 bg-water-50 border border-water-200 text-water-900 font-bold rounded-xl text-sm outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">القيمة (يدوي) *</label>
+                                <input type="number" step="any" id="gov-value" required oninput="calcGovTotal()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">متأخرات</label>
+                                <input type="number" step="any" id="gov-arrears" oninput="calcGovTotal()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">رسوم ومجاري</label>
+                                <input type="number" step="any" id="gov-fees" oninput="calcGovTotal()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-emerald-700 mb-1">المبلغ المستحق *</label>
+                                <input type="number" step="any" id="gov-total" required class="w-full px-3 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold rounded-xl text-sm focus:border-emerald-600 outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">صورة مرفق (اختياري)</label>
+                                <label class="flex items-center justify-center gap-2 w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 rounded-xl text-xs text-slate-600 cursor-pointer transition">
+                                    <i class="fas fa-camera text-water-600"></i>
+                                    <span id="gov-file-label">التقاط أو رفع صورة</span>
+                                    <input type="file" id="gov-attachment" accept="image/*" class="hidden" onchange="handleFileSelect(this, 'gov-file-label')">
+                                </label>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">بيان (اختياري)</label>
+                                <input type="text" id="gov-notes" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="ملاحظات إضافية حول الفاتورة...">
+                            </div>
+
+                            <div class="sm:col-span-2 lg:col-span-3 pt-2">
+                                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-water-600 hover:bg-water-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-save"></i>
+                                    <span>حفظ الفاتورة الحكومية</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Government Bills Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-700 text-xs">سجل الفواتير الحكومية المدخلة</h3>
+                            <span id="count-gov" class="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full">0 سجل</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-3">الرقم</th>
+                                        <th class="p-3">الشهر</th>
+                                        <th class="p-3">السابقة</th>
+                                        <th class="p-3">الحالية</th>
+                                        <th class="p-3">الوحدات</th>
+                                        <th class="p-3">القيمة</th>
+                                        <th class="p-3">متأخرات</th>
+                                        <th class="p-3">رسوم ومجاري</th>
+                                        <th class="p-3">المستحق</th>
+                                        <th class="p-3">مرفق</th>
+                                        <th class="p-3">بيان</th>
+                                        <th class="p-3">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-gov" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- TAB B: شريحة إدخال بيانات وايتات                          -->
+                <!-- --------------------------------------------------------- -->
+                <div id="entry-panel-tanker" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <span class="w-2 h-6 bg-cyan-600 rounded-full"></span>
+                                إدخال بيانات وايتات المياه
+                            </h2>
+                            <span class="text-[11px] text-slate-400">الحقول * مطلوبة</span>
+                        </div>
+
+                        <form id="form-tanker" onsubmit="saveTanker(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">التاريخ *</label>
+                                <input type="date" id="tanker-date" required onchange="syncMonthFromDate('tanker-date', 'tanker-month')" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الشهر *</label>
+                                <input type="month" id="tanker-month" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الوحدات (الكمية) *</label>
+                                <input type="number" step="any" id="tanker-units" required oninput="calcTankerTotal()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">سعر الوحدة *</label>
+                                <input type="number" step="any" id="tanker-unit-price" required oninput="calcTankerTotal()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-cyan-800 mb-1">قيمة الوحدات (آلي)</label>
+                                <input type="number" step="any" id="tanker-total" readonly class="w-full px-3 py-2.5 bg-cyan-50 border border-cyan-200 text-cyan-900 font-bold rounded-xl text-sm outline-none" placeholder="0">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">البيان</label>
+                                <input type="text" id="tanker-notes" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="اسم السائق أو تفاصيل الوايت...">
+                            </div>
+
+                            <div class="sm:col-span-2 lg:col-span-3 pt-2">
+                                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-save"></i>
+                                    <span>حفظ بيانات الوايت</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tankers Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-700 text-xs">سجل الوايتات المدخلة</h3>
+                            <span id="count-tanker" class="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full">0 سجل</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-3">التاريخ</th>
+                                        <th class="p-3">الشهر</th>
+                                        <th class="p-3">الوحدات</th>
+                                        <th class="p-3">سعر الوحدة</th>
+                                        <th class="p-3">قيمة الوحدات</th>
+                                        <th class="p-3">البيان</th>
+                                        <th class="p-3">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-tanker" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- TAB C: شريحة إدخال بيانات خدمات أخرى                      -->
+                <!-- --------------------------------------------------------- -->
+                <div id="entry-panel-services" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
+                                إدخال بيانات خدمات أخرى
+                            </h2>
+                            <span class="text-[11px] text-slate-400">الحقول * مطلوبة</span>
+                        </div>
+
+                        <form id="form-services" onsubmit="saveService(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">التاريخ *</label>
+                                <input type="date" id="service-date" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الخدمة *</label>
+                                <select id="service-type" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none">
+                                    <option value="كهرباء">كهرباء</option>
+                                    <option value="صيانة">صيانة</option>
+                                    <option value="أخرى">أخرى</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">المبلغ *</label>
+                                <input type="number" step="any" id="service-amount" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">البيان *</label>
+                                <input type="text" id="service-notes" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="وصف الخدمة أو الصيانة...">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">المرفق (اختياري)</label>
+                                <label class="flex items-center justify-center gap-2 w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 rounded-xl text-xs text-slate-600 cursor-pointer transition">
+                                    <i class="fas fa-paperclip text-indigo-600"></i>
+                                    <span id="service-file-label">إرفاق صورة/إيصال</span>
+                                    <input type="file" id="service-attachment" accept="image/*" class="hidden" onchange="handleFileSelect(this, 'service-file-label')">
+                                </label>
+                            </div>
+
+                            <div class="sm:col-span-2 lg:col-span-3 pt-2">
+                                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-save"></i>
+                                    <span>حفظ بيانات الخدمة</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Services Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-700 text-xs">سجل الخدمات الأخرى</h3>
+                            <span id="count-services" class="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full">0 سجل</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-3">التاريخ</th>
+                                        <th class="p-3">الخدمة</th>
+                                        <th class="p-3">البيان</th>
+                                        <th class="p-3">المبلغ</th>
+                                        <th class="p-3">المرفق</th>
+                                        <th class="p-3">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-services" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- TAB D: شريحة إدخال بيانات مشتركين                         -->
+                <!-- --------------------------------------------------------- -->
+                <div id="entry-panel-subscribers" class="hidden space-y-4">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <span class="w-2 h-6 bg-emerald-600 rounded-full"></span>
+                                إدخال بيانات المشتركين (الشقق)
+                            </h2>
+                            <span class="text-[11px] text-slate-400">الحقول * مطلوبة</span>
+                        </div>
+
+                        <form id="form-subscribers" onsubmit="saveSubscriber(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الشقة *</label>
+                                <input type="text" id="sub-apt" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="مثال: 1 أو A1">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الاسم *</label>
+                                <input type="text" id="sub-name" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="اسم الساكن / المالك">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الهاتف *</label>
+                                <input type="tel" id="sub-phone" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="77xxxxxxx">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">الرصيد الافتتاحي *</label>
+                                <input type="number" step="any" id="sub-opening" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-water-600 focus:bg-white outline-none" placeholder="0">
+                            </div>
+
+                            <div class="sm:col-span-2 lg:col-span-4 pt-2">
+                                <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-user-plus"></i>
+                                    <span>إضافة المشترك</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Subscribers Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-700 text-xs">قائمة المشتركين المسجلين</h3>
+                            <span id="count-subscribers" class="bg-slate-100 text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full">0 مشترك</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-3">رقم الشقة</th>
+                                        <th class="p-3">الاسم</th>
+                                        <th class="p-3">رقم الهاتف</th>
+                                        <th class="p-3">الرصيد الافتتاحي</th>
+                                        <th class="p-3">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-subscribers" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================= -->
+            <!-- VIEW 2: REPORTS & INTERACTIVE DASHBOARD (نافذة التقارير)      -->
+            <!-- ============================================================= -->
+            <section id="view-reports" class="hidden space-y-4">
+                <!-- Report Sub-Navigation -->
+                <div class="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/70 grid grid-cols-3 gap-1.5 no-print">
+                    <button onclick="switchReportTab('dashboard')" id="rep-btn-dashboard" class="tab-active py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>لوحة التحكم</span>
+                    </button>
+                    <button onclick="switchReportTab('sub-accounts')" id="rep-btn-sub-accounts" class="text-slate-600 hover:bg-slate-100 py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-address-book"></i>
+                        <span>حسابات مشتركين</span>
+                    </button>
+                    <button onclick="switchReportTab('general-accounts')" id="rep-btn-general-accounts" class="text-slate-600 hover:bg-slate-100 py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i class="fas fa-file-contract"></i>
+                        <span>حسابات عامة</span>
+                    </button>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- REPORT A: Interactive HTML Dashboard (داش بورد تفاعلية)    -->
+                <!-- --------------------------------------------------------- -->
+                <div id="report-panel-dashboard" class="space-y-4">
+                    <!-- KPI Summary Cards -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div class="bg-gradient-to-br from-water-600 to-water-800 text-white p-4 rounded-2xl shadow-md">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-water-100 text-xs font-semibold">الفواتير الحكومية</span>
+                                <span class="p-2 bg-white/15 rounded-xl"><i class="fas fa-file-invoice-dollar"></i></span>
+                            </div>
+                            <div id="kpi-gov" class="text-xl sm:text-2xl font-extrabold">0</div>
+                            <div class="text-[10px] text-water-200 mt-1" id="kpi-gov-units">0 وحدة مستهلكة</div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-cyan-600 to-teal-700 text-white p-4 rounded-2xl shadow-md">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-cyan-100 text-xs font-semibold">إجمالي الوايتات</span>
+                                <span class="p-2 bg-white/15 rounded-xl"><i class="fas fa-truck-droplet"></i></span>
+                            </div>
+                            <div id="kpi-tanker" class="text-xl sm:text-2xl font-extrabold">0</div>
+                            <div class="text-[10px] text-cyan-100 mt-1" id="kpi-tanker-units">0 وحدة / نقلة</div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-4 rounded-2xl shadow-md">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-indigo-100 text-xs font-semibold">الخدمات الأخرى</span>
+                                <span class="p-2 bg-white/15 rounded-xl"><i class="fas fa-tools"></i></span>
+                            </div>
+                            <div id="kpi-services" class="text-xl sm:text-2xl font-extrabold">0</div>
+                            <div class="text-[10px] text-indigo-100 mt-1">كهرباء / صيانة / أخرى</div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-md">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-slate-300 text-xs font-semibold">المجموع العام</span>
+                                <span class="p-2 bg-white/15 rounded-xl"><i class="fas fa-coins text-amber-400"></i></span>
+                            </div>
+                            <div id="kpi-grand-total" class="text-xl sm:text-2xl font-extrabold text-amber-400">0</div>
+                            <div class="text-[10px] text-slate-300 mt-1" id="kpi-sub-count">0 شقة / مشترك</div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/70">
+                            <h3 class="font-bold text-slate-700 text-xs mb-3 flex items-center gap-2">
+                                <i class="fas fa-chart-doughnut text-water-600"></i>
+                                توزيع المصروفات حسب الفئة
+                            </h3>
+                            <div class="relative h-60 flex items-center justify-center">
+                                <canvas id="expenseDoughnutChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/70">
+                            <h3 class="font-bold text-slate-700 text-xs mb-3 flex items-center gap-2">
+                                <i class="fas fa-chart-bar text-cyan-600"></i>
+                                مقارنة المصروفات الشهرية
+                            </h3>
+                            <div class="relative h-60 flex items-center justify-center">
+                                <canvas id="monthlyBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- REPORT B: حسابات المشتركين (Subscriber Accounts)          -->
+                <!-- --------------------------------------------------------- -->
+                <div id="report-panel-sub-accounts" class="hidden space-y-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/70 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm">كشف حسابات المشتركين</h3>
+                                <p class="text-[11px] text-slate-500">يتم احتساب حصة الشقة بالتساوي من إجمالي مصاريف الفترة المحددة</p>
+                            </div>
+                            <div class="flex items-center gap-2 no-print">
+                                <input type="month" id="filter-sub-month" onchange="renderSubscriberAccounts()" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none">
+                                <button onclick="document.getElementById('filter-sub-month').value=''; renderSubscriberAccounts();" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600">الكل</button>
+                                <button onclick="window.print()" class="px-3 py-1.5 bg-water-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                                    <i class="fas fa-print"></i> طباعة
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-3">رقم الشقة</th>
+                                        <th class="p-3">اسم المشترك</th>
+                                        <th class="p-3">الهاتف</th>
+                                        <th class="p-3">الرصيد الافتتاحي</th>
+                                        <th class="p-3">حصة الفواتير والخدمات</th>
+                                        <th class="p-3">الإجمالي المستحق</th>
+                                        <th class="p-3 no-print">مشاركة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-sub-accounts" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- --------------------------------------------------------- -->
+                <!-- REPORT C: الحسابات العامة (General Accounts)              -->
+                <!-- --------------------------------------------------------- -->
+                <div id="report-panel-general-accounts" class="hidden space-y-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/70 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm">تقرير الحسابات العامة</h3>
+                                <p class="text-[11px] text-slate-500">ملخص تفصيلي لكافة الإيرادات والمصروفات المسجلة</p>
+                            </div>
+                            <div class="flex items-center gap-2 no-print">
+                                <input type="month" id="filter-gen-month" onchange="renderGeneralAccounts()" class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none">
+                                <button onclick="document.getElementById('filter-gen-month').value=''; renderGeneralAccounts();" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600">الكل</button>
+                                <button onclick="window.print()" class="px-3 py-1.5 bg-water-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                                    <i class="fas fa-print"></i> طباعة
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Summary Breakdown -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="general-summary-boxes"></div>
+
+                        <!-- Unified Ledger Table -->
+                        <div class="overflow-x-auto pt-2">
+                            <table class="w-full text-right text-xs whitespace-nowrap">
+                                <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-3">التاريخ / الشهر</th>
+                                        <th class="p-3">البند / التصنيف</th>
+                                        <th class="p-3">البيان والتفاصيل</th>
+                                        <th class="p-3">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-general-ledger" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================================================= -->
+            <!-- VIEW 3: SETTINGS & ANDROID DEPLOYMENT (نافذة الإعدادات)       -->
+            <!-- ============================================================= -->
+            <section id="view-settings" class="hidden space-y-4">
+                
+                <!-- Android App Install & Share Card -->
+                <div class="bg-gradient-to-br from-emerald-600 to-teal-800 text-white rounded-2xl p-5 shadow-md space-y-4">
+                    <div class="flex items-start gap-3">
+                        <div class="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center shrink-0">
+                            <i class="fab fa-android text-3xl text-emerald-200"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-base">تثبيت ومشاركة التطبيق على أندرويد</h2>
+                            <p class="text-xs text-emerald-100 mt-0.5 leading-relaxed">يمكن تثبيت هذا النظام كتطبيق أندرويد مستقل على الهاتف ويعمل بدون إنترنت بالكامل.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        <button onclick="triggerPWAInstall()" class="py-3 px-4 bg-white text-emerald-900 hover:bg-emerald-50 font-bold rounded-xl text-xs shadow flex items-center justify-center gap-2 transition">
+                            <i class="fas fa-download"></i>
+                            <span>تثبيت التطبيق مباشرة على الجهاز</span>
+                        </button>
+                        <button onclick="shareApplication()" class="py-3 px-4 bg-emerald-900/40 hover:bg-emerald-900/60 border border-white/20 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                            <i class="fas fa-share-alt"></i>
+                            <span>مشاركة التطبيق ورابط التحميل</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-black/20 rounded-xl p-3 text-[11px] text-emerald-50 space-y-1">
+                        <p class="font-bold text-white"><i class="fas fa-info-circle ml-1"></i> طريقة التثبيت أو التحويل إلى APK للجمهور:</p>
+                        <p>1. افتح الرابط في متصفح <strong>Google Chrome</strong> على أندرويد واضغط <strong>"تثبيت التطبيق"</strong> أو من قائمة المتصفح اختر <strong>"الإضافة إلى الشاشة الرئيسية"</strong>.</p>
+                        <p>2. لتوليد ملف <strong>APK / AAB</strong> لرفعه على متجر Google Play: ارفع هذا الملف على أي استضافة مجانية (مثل GitHub Pages أو Netlify) ثم ضع الرابط في موقع <strong>PWABuilder.com</strong> لتحميل حزمة أندرويد جاهزة.</p>
+                    </div>
+                </div>
+
+                <!-- General System Settings -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5 space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                        <i class="fas fa-sliders-h text-water-600"></i>
+                        إعدادات النظام والعملة والوقت
+                    </h3>
+
+                    <form onsubmit="saveSystemSettings(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">اسم المبنى / المجمع السكني</label>
+                            <input type="text" id="set-building-name" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">العملة المعتمدة</label>
+                            <select id="set-currency" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600">
+                                <option value="ر.ي">ريال يمني (ر.ي)</option>
+                                <option value="ر.س">ريال سعودي (ر.س)</option>
+                                <option value="$">دولار أمريكي ($)</option>
+                                <option value="د.إ">درهم إماراتي (د.إ)</option>
+                                <option value="ج.م">جنيه مصري (ج.م)</option>
+                                <option value="د.أ">دينار أردني (د.أ)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">تنسيق الوقت والمنطقة الزمنية</label>
+                            <select id="set-timezone" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600">
+                                <option value="Asia/Aden">توقيت صنعاء / عدن (GMT+3)</option>
+                                <option value="Asia/Riyadh">توقيت الرياض (GMT+3)</option>
+                                <option value="Asia/Dubai">توقيت دبي (GMT+4)</option>
+                                <option value="Africa/Cairo">توقيت القاهرة (GMT+2)</option>
+                                <option value="local">توقيت الجهاز التلقائي</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">تنسيق العرض الزمني</label>
+                            <select id="set-timeformat" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600">
+                                <option value="12">نظام 12 ساعة (ص / م)</option>
+                                <option value="24">نظام 24 ساعة</option>
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-water-600 hover:bg-water-700 text-white font-bold rounded-xl text-xs shadow transition">
+                                حفظ الإعدادات العامة
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Security & Login Credentials -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5 space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                        <i class="fas fa-user-shield text-water-600"></i>
+                        بيانات الدخول والأمان
+                    </h3>
+
+                    <form onsubmit="updateCredentials(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">اسم المستخدم الجديد</label>
+                            <input type="text" id="set-username" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور الجديدة</label>
+                            <input type="password" id="set-password" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-water-600" placeholder="••••••••">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs shadow transition">
+                                تحديث بيانات الدخول
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Backup & Data Management -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/70 p-4 sm:p-5 space-y-4">
+                    <h3 class="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                        <i class="fas fa-database text-water-600"></i>
+                        النسخ الاحتياطي وإدارة البيانات
+                    </h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <button onclick="exportBackupJSON()" class="py-3 px-4 bg-water-50 hover:bg-water-100 text-water-800 border border-water-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                            <i class="fas fa-file-export"></i>
+                            <span>تصدير نسخة احتياطية</span>
+                        </button>
+
+                        <label class="py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+                            <i class="fas fa-file-import"></i>
+                            <span>استيراد نسخة احتياطية</span>
+                            <input type="file" accept=".json" class="hidden" onchange="importBackupJSON(event)">
+                        </label>
+
+                        <button onclick="confirmClearAllData()" class="py-3 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition">
+                            <i class="fas fa-trash-alt"></i>
+                            <span>تصفير كافة البيانات</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Bottom Fixed Mobile Navigation Bar -->
+        <nav class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-30 no-print safe-area-pb">
+            <div class="max-w-5xl mx-auto grid grid-cols-3 h-16">
+                <button onclick="switchMainView('entry')" id="nav-entry" class="nav-item-active flex flex-col items-center justify-center gap-1 text-slate-500 transition">
+                    <i class="fas fa-edit text-lg transition-transform"></i>
+                    <span class="text-[11px] font-bold">الإدخال</span>
+                </button>
+                <button onclick="switchMainView('reports')" id="nav-reports" class="flex flex-col items-center justify-center gap-1 text-slate-500 transition">
+                    <i class="fas fa-chart-line text-lg transition-transform"></i>
+                    <span class="text-[11px] font-bold">التقارير والداش بورد</span>
+                </button>
+                <button onclick="switchMainView('settings')" id="nav-settings" class="flex flex-col items-center justify-center gap-1 text-slate-500 transition">
+                    <i class="fas fa-cog text-lg transition-transform"></i>
+                    <span class="text-[11px] font-bold">الإعدادات والمشاركة</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        /**
+         * =========================================================================
+         * STATE MANAGEMENT & EMPTY INITIALIZATION (Zero Dummy Data)
+         * =========================================================================
+         */
+        const STORAGE_KEY = 'water_apt_billing_system_v1';
+
+        // Strict empty initial state - NO default records or dummy numbers
+        const defaultState = {
+            auth: {
+                isSetup: false,
+                username: '',
+                password: ''
+            },
+            settings: {
+                buildingName: 'نظام فواتير المياه والشقق',
+                currency: 'ر.ي',
+                timezone: 'Asia/Aden',
+                timeFormat: '12'
+            },
+            data: {
+                govBills: [],
+                tankers: [],
+                services: [],
+                subscribers: []
+            }
+        };
+
+        let appState = loadState();
+        let deferredPrompt = null;
+        let doughnutChartInstance = null;
+        let barChartInstance = null;
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return JSON.parse(JSON.stringify(defaultState));
+                const parsed = JSON.parse(raw);
+                return {
+                    auth: { ...defaultState.auth, ...(parsed.auth || {}) },
+                    settings: { ...defaultState.settings, ...(parsed.settings || {}) },
+                    data: {
+                        govBills: Array.isArray(parsed.data?.govBills) ? parsed.data.govBills : [],
+                        tankers: Array.isArray(parsed.data?.tankers) ? parsed.data.tankers : [],
+                        services: Array.isArray(parsed.data?.services) ? parsed.data.services : [],
+                        subscribers: Array.isArray(parsed.data?.subscribers) ? parsed.data.subscribers : []
+                    }
+                };
+            } catch (e) {
+                console.error('Failed to load state:', e);
+                return JSON.parse(JSON.stringify(defaultState));
+            }
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (e) {
+                showToast('تنبيه: مساحة التخزين ممتلئة، يفضل تقليل حجم الصور المرفقة', 'error');
+            }
+        }
+
+        /**
+         * =========================================================================
+         * PWA MANIFEST & SERVICE WORKER SETUP FOR ANDROID INSTALLABILITY
+         * =========================================================================
+         */
+        function initPWA() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./service-worker.js')
+              .catch((error) => console.error('Service Worker registration failed:', error));
+        }
+     }
+
+     window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('login-install-box')?.classList.remove('hidden');
+            document.getElementById('header-install-btn')?.classList.remove('hidden');
+        });
+
+        async function triggerPWAInstall() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    showToast('جاري تثبيت التطبيق على شاشتك الرئيسية...', 'success');
+                }
+                deferredPrompt = null;
+            } else {
+                openModal(
+                    'تثبيت التطبيق على أندرويد',
+                    `<div class="space-y-3 text-right leading-relaxed">
+                        <p>لتثبيت التطبيق مباشرة على هاتفك الأندرويد:</p>
+                        <ol class="list-decimal list-inside space-y-1.5 text-slate-700 font-medium">
+                            <li>اضغط على قائمة المتصفح (النقاط الثلاث <strong>⋮</strong> في الأعلى).</li>
+                            <li>اختر <strong>"تثبيت التطبيق"</strong> أو <strong>"الإضافة إلى الشاشة الرئيسية"</strong>.</li>
+                            <li>سيظهر التطبيق بأيقونته الخاصة ضمن تطبيقات هاتفك.</li>
+                        </ol>
+                    </div>`,
+                    `<button onclick="closeModal()" class="px-4 py-2 bg-water-600 text-white rounded-xl text-xs font-bold">حسناً</button>`
+                );
+            }
+        }
+
+        async function shareApplication() {
+            const shareData = {
+                title: appState.settings.buildingName,
+                text: `تطبيق ${appState.settings.buildingName} لإدارة فواتير المياه والخدمات للشقق السكنية`,
+                url: window.location.href
+            };
+
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                } catch (err) {}
+            } else {
+                const tempInput = document.createElement('input');
+                tempInput.value = window.location.href;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                showToast('تم نسخ رابط التطبيق لمشاركته مع السكان', 'success');
+            }
+        }
+
+        /**
+         * =========================================================================
+         * 1. AUTHENTICATION (LOGIN / FIRST-TIME SETUP / LOGOUT)
+         * =========================================================================
+         */
+        function initAuthUI() {
+            document.getElementById('auth-app-title').textContent = appState.settings.buildingName;
+            const isSetup = appState.auth.isSetup;
+
+            if (!isSetup) {
+                document.getElementById('first-time-banner').classList.remove('hidden');
+                document.getElementById('confirm-password-group').classList.remove('hidden');
+                document.getElementById('auth-password-confirm').required = true;
+                document.getElementById('auth-submit-btn').innerHTML = '<i class="fas fa-user-check"></i><span>إنشاء حساب المدير والدخول</span>';
+            } else {
+                document.getElementById('first-time-banner').classList.add('hidden');
+                document.getElementById('confirm-password-group').classList.add('hidden');
+                document.getElementById('auth-password-confirm').required = false;
+                document.getElementById('auth-submit-btn').innerHTML = '<i class="fas fa-sign-in-alt"></i><span>تسجيل الدخول</span>';
+            }
+
+            if (sessionStorage.getItem('water_app_logged_in') === 'true' && isSetup) {
+                enterApp();
+            }
+        }
+
+        function handleAuthSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+
+            if (!appState.auth.isSetup) {
+                const confirmPass = document.getElementById('auth-password-confirm').value;
+                if (password !== confirmPass) {
+                    showToast('كلمة المرور وتأكيدها غير متطابقين', 'error');
+                    return;
+                }
+                appState.auth.isSetup = true;
+                appState.auth.username = username;
+                appState.auth.password = password;
+                saveState();
+                sessionStorage.setItem('water_app_logged_in', 'true');
+                showToast('تم إعداد حساب المدير بنجاح', 'success');
+                enterApp();
+            } else {
+                if (username === appState.auth.username && password === appState.auth.password) {
+                    sessionStorage.setItem('water_app_logged_in', 'true');
+                    showToast('مرحباً بك مجدداً', 'success');
+                    enterApp();
+                } else {
+                    showToast('اسم المستخدم أو كلمة المرور غير صحيحة', 'error');
+                }
+            }
+        }
+
+        function enterApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+            applySettingsToUI();
+            renderAllTables();
+            updateDashboard();
+        }
+
+        function logout() {
+            sessionStorage.removeItem('water_app_logged_in');
+            document.getElementById('auth-password').value = '';
+            document.getElementById('app-shell').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            initAuthUI();
+            showToast('تم تسجيل الخروج بنجاح', 'info');
+        }
+
+        function togglePasswordVisibility(inputId) {
+            const inp = document.getElementById(inputId);
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        /**
+         * =========================================================================
+         * NAVIGATION & UI HELPERS
+         * =========================================================================
+         */
+        function switchMainView(viewName) {
+            ['entry', 'reports', 'settings'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                document.getElementById(`nav-${v}`).classList.remove('nav-item-active');
+            });
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.getElementById(`nav-${viewName}`).classList.add('nav-item-active');
+
+            if (viewName === 'reports') {
+                updateDashboard();
+                renderSubscriberAccounts();
+                renderGeneralAccounts();
+            }
+        }
+
+        function switchEntryTab(tabName) {
+            ['gov', 'tanker', 'services', 'subscribers'].forEach(t => {
+                document.getElementById(`entry-panel-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-btn-${t}`);
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+            });
+            document.getElementById(`entry-panel-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+        }
+
+        function switchReportTab(repName) {
+            ['dashboard', 'sub-accounts', 'general-accounts'].forEach(r => {
+                document.getElementById(`report-panel-${r}`).classList.add('hidden');
+                const btn = document.getElementById(`rep-btn-${r}`);
+                btn.classList.remove('tab-active');
+                btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+            });
+            document.getElementById(`report-panel-${repName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`rep-btn-${repName}`);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+
+            if (repName === 'dashboard') updateDashboard();
+            if (repName === 'sub-accounts') renderSubscriberAccounts();
+            if (repName === 'general-accounts') renderGeneralAccounts();
+        }
+
+        function formatMoney(amount) {
+            const num = Number(amount) || 0;
+            return `${num.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${appState.settings.currency}`;
+        }
+
+        function syncMonthFromDate(dateId, monthId) {
+            const dateVal = document.getElementById(dateId).value;
+            if (dateVal && dateVal.length >= 7) {
+                document.getElementById(monthId).value = dateVal.substring(0, 7);
+            }
+        }
+
+        // Image compression to Base64 for localStorage efficiency
+        function compressImageToDataURL(file) {
+            return new Promise((resolve) => {
+                if (!file) return resolve(null);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_W = 800;
+                        let w = img.width;
+                        let h = img.height;
+                        if (w > MAX_W) {
+                            h = Math.round((h * MAX_W) / w);
+                            w = MAX_W;
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.65));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function handleFileSelect(input, labelId) {
+            const label = document.getElementById(labelId);
+            if (input.files && input.files[0]) {
+                label.textContent = input.files[0].name;
+            } else {
+                label.textContent = 'إرفاق صورة';
+            }
+        }
+
+        function previewAttachment(dataUrl, title) {
+            openModal(
+                title || 'معاينة المرفق',
+                `<div class="flex justify-center"><img src="${dataUrl}" class="max-w-full rounded-xl border border-slate-200" alt="مرفق"></div>`,
+                `<button onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold">إغلاق</button>`
+            );
+        }
+
+        /**
+         * =========================================================================
+         * 2. DATA ENTRY CALCULATIONS & CRUD OPERATIONS
+         * =========================================================================
+         */
+
+        // --- A. Government Bills ---
+        function calcGovBill() {
+            const prev = parseFloat(document.getElementById('gov-prev-read').value) || 0;
+            const curr = parseFloat(document.getElementById('gov-curr-read').value) || 0;
+            const units = curr - prev;
+            document.getElementById('gov-units').value = units >= 0 ? units : 0;
+        }
+
+        function calcGovTotal() {
+            const val = parseFloat(document.getElementById('gov-value').value) || 0;
+            const arrears = parseFloat(document.getElementById('gov-arrears').value) || 0;
+            const fees = parseFloat(document.getElementById('gov-fees').value) || 0;
+            document.getElementById('gov-total').value = (val + arrears + fees).toFixed(2).replace(/\.00$/, '');
+        }
+
+        async function saveGovBill(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('gov-attachment');
+            const attachmentData = await compressImageToDataURL(fileInput.files[0]);
+
+            const record = {
+                id: Date.now().toString(),
+                number: document.getElementById('gov-number').value.trim(),
+                month: document.getElementById('gov-month').value,
+                prevRead: parseFloat(document.getElementById('gov-prev-read').value) || 0,
+                currRead: parseFloat(document.getElementById('gov-curr-read').value) || 0,
+                units: parseFloat(document.getElementById('gov-units').value) || 0,
+                value: parseFloat(document.getElementById('gov-value').value) || 0,
+                arrears: parseFloat(document.getElementById('gov-arrears').value) || 0,
+                fees: parseFloat(document.getElementById('gov-fees').value) || 0,
+                total: parseFloat(document.getElementById('gov-total').value) || 0,
+                attachment: attachmentData,
+                notes: document.getElementById('gov-notes').value.trim()
+            };
+
+            appState.data.govBills.unshift(record);
+            saveState();
+            e.target.reset();
+            document.getElementById('gov-file-label').textContent = 'التقاط أو رفع صورة';
+            renderGovTable();
+            updateDashboard();
+            showToast('تم حفظ الفاتورة الحكومية بنجاح', 'success');
+        }
+
+        // --- B. Tankers (وايتات) ---
+        function calcTankerTotal() {
+            const units = parseFloat(document.getElementById('tanker-units').value) || 0;
+            const price = parseFloat(document.getElementById('tanker-unit-price').value) || 0;
+            document.getElementById('tanker-total').value = (units * price).toFixed(2).replace(/\.00$/, '');
+        }
+
+        function saveTanker(e) {
+            e.preventDefault();
+            const record = {
+                id: Date.now().toString(),
+                date: document.getElementById('tanker-date').value,
+                month: document.getElementById('tanker-month').value,
+                units: parseFloat(document.getElementById('tanker-units').value) || 0,
+                unitPrice: parseFloat(document.getElementById('tanker-unit-price').value) || 0,
+                total: parseFloat(document.getElementById('tanker-total').value) || 0,
+                notes: document.getElementById('tanker-notes').value.trim()
+            };
+
+            appState.data.tankers.unshift(record);
+            saveState();
+            e.target.reset();
+            renderTankerTable();
+            updateDashboard();
+            showToast('تم حفظ بيانات الوايت بنجاح', 'success');
+        }
+
+        // --- C. Other Services (خدمات أخرى) ---
+        async function saveService(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('service-attachment');
+            const attachmentData = await compressImageToDataURL(fileInput.files[0]);
+            const dateVal = document.getElementById('service-date').value;
+
+            const record = {
+                id: Date.now().toString(),
+                date: dateVal,
+                month: dateVal ? dateVal.substring(0, 7) : '',
+                type: document.getElementById('service-type').value,
+                amount: parseFloat(document.getElementById('service-amount').value) || 0,
+                notes: document.getElementById('service-notes').value.trim(),
+                attachment: attachmentData
+            };
+
+            appState.data.services.unshift(record);
+            saveState();
+            e.target.reset();
+            document.getElementById('service-file-label').textContent = 'إرفاق صورة/إيصال';
+            renderServicesTable();
+            updateDashboard();
+            showToast('تم حفظ بيانات الخدمة بنجاح', 'success');
+        }
+
+        // --- D. Subscribers (المشتركين) ---
+        function saveSubscriber(e) {
+            e.preventDefault();
+            const record = {
+                id: Date.now().toString(),
+                apt: document.getElementById('sub-apt').value.trim(),
+                name: document.getElementById('sub-name').value.trim(),
+                phone: document.getElementById('sub-phone').value.trim(),
+                openingBalance: parseFloat(document.getElementById('sub-opening').value) || 0
+            };
+
+            appState.data.subscribers.push(record);
+            saveState();
+            e.target.reset();
+            renderSubscribersTable();
+            updateDashboard();
+            showToast('تم إضافة المشترك بنجاح', 'success');
+        }
+
+        function deleteRecord(collection, id) {
+            openModal(
+                'تأكيد الحذف',
+                '<p>هل أنت متأكد من حذف هذا السجل نهائياً؟</p>',
+                `<button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
+                 <button onclick="executeDelete('${collection}', '${id}')" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">نعم، حذف</button>`
+            );
+        }
+
+        function executeDelete(collection, id) {
+            appState.data[collection] = appState.data[collection].filter(item => item.id !== id);
+            saveState();
+            closeModal();
+            renderAllTables();
+            updateDashboard();
+            showToast('تم حذف السجل', 'info');
+        }
+
+        /**
+         * =========================================================================
+         * TABLE RENDERING FUNCTIONS
+         * =========================================================================
+         */
+        function renderAllTables() {
+            renderGovTable();
+            renderTankerTable();
+            renderServicesTable();
+            renderSubscribersTable();
+        }
+
+        function emptyRowHTML(colspan, message) {
+            return `<tr><td colspan="${colspan}" class="p-8 text-center text-slate-400">
+                <i class="fas fa-folder-open text-2xl mb-2 block text-slate-300"></i>
+                <span>${message}</span>
+            </td></tr>`;
+        }
+
+        function renderGovTable() {
+            const list = appState.data.govBills;
+            document.getElementById('count-gov').textContent = `${list.length} سجل`;
+            const tbody = document.getElementById('table-gov');
+            if (!list.length) {
+                tbody.innerHTML = emptyRowHTML(12, 'لا توجد فواتير حكومية مسجلة بعد');
+                return;
+            }
+            tbody.innerHTML = list.map(item => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="p-3 font-bold text-slate-700">${item.number}</td>
+                    <td class="p-3">${item.month}</td>
+                    <td class="p-3">${item.prevRead}</td>
+                    <td class="p-3">${item.currRead}</td>
+                    <td class="p-3 font-bold text-water-700">${item.units}</td>
+                    <td class="p-3">${formatMoney(item.value)}</td>
+                    <td class="p-3">${formatMoney(item.arrears)}</td>
+                    <td class="p-3">${formatMoney(item.fees)}</td>
+                    <td class="p-3 font-bold text-emerald-700">${formatMoney(item.total)}</td>
+                    <td class="p-3">
+                        ${item.attachment ? `<button onclick="previewAttachment('${item.attachment}', 'مرفق فاتورة رقم ${item.number}')" class="text-water-600 hover:underline"><i class="fas fa-image"></i> عرض</button>` : '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="p-3 text-slate-500 max-w-[150px] truncate">${item.notes || '-'}</td>
+                    <td class="p-3">
+                        <button onclick="deleteRecord('govBills', '${item.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTankerTable() {
+            const list = appState.data.tankers;
+            document.getElementById('count-tanker').textContent = `${list.length} سجل`;
+            const tbody = document.getElementById('table-tanker');
+            if (!list.length) {
+                tbody.innerHTML = emptyRowHTML(7, 'لا توجد بيانات وايتات مسجلة بعد');
+                return;
+            }
+            tbody.innerHTML = list.map(item => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="p-3">${item.date}</td>
+                    <td class="p-3">${item.month}</td>
+                    <td class="p-3 font-bold">${item.units}</td>
+                    <td class="p-3">${formatMoney(item.unitPrice)}</td>
+                    <td class="p-3 font-bold text-cyan-700">${formatMoney(item.total)}</td>
+                    <td class="p-3 text-slate-500">${item.notes || '-'}</td>
+                    <td class="p-3">
+                        <button onclick="deleteRecord('tankers', '${item.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderServicesTable() {
+            const list = appState.data.services;
+            document.getElementById('count-services').textContent = `${list.length} سجل`;
+            const tbody = document.getElementById('table-services');
+            if (!list.length) {
+                tbody.innerHTML = emptyRowHTML(6, 'لا توجد خدمات أخرى مسجلة بعد');
+                return;
+            }
+            tbody.innerHTML = list.map(item => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="p-3">${item.date}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-semibold">${item.type}</span></td>
+                    <td class="p-3 text-slate-600">${item.notes}</td>
+                    <td class="p-3 font-bold text-indigo-700">${formatMoney(item.amount)}</td>
+                    <td class="p-3">
+                        ${item.attachment ? `<button onclick="previewAttachment('${item.attachment}', 'مرفق ${item.type}')" class="text-indigo-600 hover:underline"><i class="fas fa-image"></i> عرض</button>` : '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="p-3">
+                        <button onclick="deleteRecord('services', '${item.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderSubscribersTable() {
+            const list = appState.data.subscribers;
+            document.getElementById('count-subscribers').textContent = `${list.length} مشترك`;
+            const tbody = document.getElementById('table-subscribers');
+            if (!list.length) {
+                tbody.innerHTML = emptyRowHTML(5, 'لا يوجد مشتركين مسجلين بعد');
+                return;
+            }
+            tbody.innerHTML = list.map(item => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="p-3 font-bold text-emerald-700">${item.apt}</td>
+                    <td class="p-3 font-semibold">${item.name}</td>
+                    <td class="p-3" dir="ltr">${item.phone}</td>
+                    <td class="p-3 font-bold">${formatMoney(item.openingBalance)}</td>
+                    <td class="p-3">
+                        <button onclick="deleteRecord('subscribers', '${item.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * =========================================================================
+         * 3. REPORTS & INTERACTIVE DASHBOARD
+         * =========================================================================
+         */
+        function updateDashboard() {
+            const govTotal = appState.data.govBills.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            const govUnits = appState.data.govBills.reduce((s, x) => s + (Number(x.units) || 0), 0);
+            
+            const tankerTotal = appState.data.tankers.reduce((s, x) => s + (Number(x.total) || 0), 0);
+            const tankerUnits = appState.data.tankers.reduce((s, x) => s + (Number(x.units) || 0), 0);
+
+            const servicesTotal = appState.data.services.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+            const grandTotal = govTotal + tankerTotal + servicesTotal;
+
+            document.getElementById('kpi-gov').textContent = formatMoney(govTotal);
+            document.getElementById('kpi-gov-units').textContent = `${govUnits} وحدة مستهلكة`;
+
+            document.getElementById('kpi-tanker').textContent = formatMoney(tankerTotal);
+            document.getElementById('kpi-tanker-units').textContent = `${tankerUnits} وحدة وايتات`;
+
+            document.getElementById('kpi-services').textContent = formatMoney(servicesTotal);
+            document.getElementById('kpi-grand-total').textContent = formatMoney(grandTotal);
+            document.getElementById('kpi-sub-count').textContent = `${appState.data.subscribers.length} شقة / مشترك`;
+
+            renderCharts(govTotal, tankerTotal, servicesTotal);
+        }
+
+        function renderCharts(govTotal, tankerTotal, servicesTotal) {
+            const ctxDoughnut = document.getElementById('expenseDoughnutChart');
+            const ctxBar = document.getElementById('monthlyBarChart');
+            if (!ctxDoughnut || !ctxBar) return;
+
+            if (doughnutChartInstance) doughnutChartInstance.destroy();
+            if (barChartInstance) barChartInstance.destroy();
+
+            const hasData = (govTotal + tankerTotal + servicesTotal) > 0;
+
+            doughnutChartInstance = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: hasData ? ['فواتير حكومية', 'وايتات المياه', 'خدمات أخرى'] : ['لا توجد بيانات بعد'],
+                    datasets: [{
+                        data: hasData ? [govTotal, tankerTotal, servicesTotal] : [1],
+                        backgroundColor: hasData ? ['#0284c7', '#0891b2', '#4f46e5'] : ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Cairo', size: 11 } } }
+                    }
+                }
+            });
+
+            // Group totals by month
+            const monthsSet = new Set([
+                ...appState.data.govBills.map(x => x.month),
+                ...appState.data.tankers.map(x => x.month),
+                ...appState.data.services.map(x => x.month)
+            ].filter(Boolean));
+
+            const sortedMonths = Array.from(monthsSet).sort();
+            const govMonthly = sortedMonths.map(m => appState.data.govBills.filter(x => x.month === m).reduce((s, x) => s + x.total, 0));
+            const tankerMonthly = sortedMonths.map(m => appState.data.tankers.filter(x => x.month === m).reduce((s, x) => s + x.total, 0));
+            const serviceMonthly = sortedMonths.map(m => appState.data.services.filter(x => x.month === m).reduce((s, x) => s + x.amount, 0));
+
+            barChartInstance = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: sortedMonths.length ? sortedMonths : ['لا توجد أشهر مسجلة'],
+                    datasets: [
+                        { label: 'حكومية', data: sortedMonths.length ? govMonthly : [0], backgroundColor: '#0284c7', borderRadius: 6 },
+                        { label: 'وايتات', data: sortedMonths.length ? tankerMonthly : [0], backgroundColor: '#0891b2', borderRadius: 6 },
+                        { label: 'خدمات', data: sortedMonths.length ? serviceMonthly : [0], backgroundColor: '#4f46e5', borderRadius: 6 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { font: { family: 'Cairo', size: 10 } } },
+                        x: { ticks: { font: { family: 'Cairo', size: 10 } } }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Cairo', size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderSubscriberAccounts() {
+            const monthFilter = document.getElementById('filter-sub-month').value;
+            const subs = appState.data.subscribers;
+            const tbody = document.getElementById('table-sub-accounts');
+
+            if (!subs.length) {
+                tbody.innerHTML = emptyRowHTML(7, 'يرجى إضافة المشتركين أولاً من نافذة الإدخال لعرض كشوف الحسابات');
+                return;
+            }
+
+            const govSum = appState.data.govBills
+                .filter(x => !monthFilter || x.month === monthFilter)
+                .reduce((s, x) => s + x.total, 0);
+            const tankerSum = appState.data.tankers
+                .filter(x => !monthFilter || x.month === monthFilter)
+                .reduce((s, x) => s + x.total, 0);
+            const servSum = appState.data.services
+                .filter(x => !monthFilter || x.month === monthFilter)
+                .reduce((s, x) => s + x.amount, 0);
+
+            const totalExpenses = govSum + tankerSum + servSum;
+            const sharePerApt = subs.length > 0 ? (totalExpenses / subs.length) : 0;
+
+            tbody.innerHTML = subs.map(sub => {
+                const opening = Number(sub.openingBalance) || 0;
+                const finalDue = opening + sharePerApt;
+                const periodText = monthFilter ? `لشهر ${monthFilter}` : 'لإجمالي الفترة';
+                const waText = encodeURIComponent(
+                    `*${appState.settings.buildingName}*\n` +
+                    `كشف حساب شقة رقم: *${sub.apt}*\n` +
+                    `الاسم: ${sub.name}\n` +
+                    `الفترة: ${periodText}\n` +
+                    `الرصيد السابق: ${formatMoney(opening)}\n` +
+                    `حصة الفواتير والخدمات: ${formatMoney(sharePerApt)}\n` +
+                    `*الإجمالي المستحق: ${formatMoney(finalDue)}*`
+                );
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 font-bold text-water-700">${sub.apt}</td>
+                        <td class="p-3 font-semibold">${sub.name}</td>
+                        <td class="p-3" dir="ltr">${sub.phone}</td>
+                        <td class="p-3">${formatMoney(opening)}</td>
+                        <td class="p-3 text-cyan-700 font-semibold">${formatMoney(sharePerApt)}</td>
+                        <td class="p-3 font-extrabold text-emerald-700">${formatMoney(finalDue)}</td>
+                        <td class="p-3 no-print">
+                            <a href="https://wa.me/${sub.phone.replace(/[^0-9]/g, '')}?text=${waText}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold">
+                                <i class="fab fa-whatsapp"></i> إرسال
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderGeneralAccounts() {
+            const monthFilter = document.getElementById('filter-gen-month').value;
+
+            const govList = appState.data.govBills.filter(x => !monthFilter || x.month === monthFilter);
+            const tankerList = appState.data.tankers.filter(x => !monthFilter || x.month === monthFilter);
+            const servList = appState.data.services.filter(x => !monthFilter || x.month === monthFilter);
+
+            const govSum = govList.reduce((s, x) => s + x.total, 0);
+            const tankerSum = tankerList.reduce((s, x) => s + x.total, 0);
+            const servSum = servList.reduce((s, x) => s + x.amount, 0);
+            const grandSum = govSum + tankerSum + servSum;
+
+            document.getElementById('general-summary-boxes').innerHTML = `
+                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 flex justify-between items-center">
+                    <span class="text-xs font-semibold text-slate-600">إجمالي الفواتير الحكومية (${govList.length})</span>
+                    <span class="font-bold text-water-700">${formatMoney(govSum)}</span>
+                </div>
+                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 flex justify-between items-center">
+                    <span class="text-xs font-semibold text-slate-600">إجمالي وايتات المياه (${tankerList.length})</span>
+                    <span class="font-bold text-cyan-700">${formatMoney(tankerSum)}</span>
+                </div>
+                <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 flex justify-between items-center">
+                    <span class="text-xs font-semibold text-slate-600">إجمالي الخدمات الأخرى (${servList.length})</span>
+                    <span class="font-bold text-indigo-700">${formatMoney(servSum)}</span>
+                </div>
+                <div class="p-3.5 bg-water-900 text-white rounded-xl flex justify-between items-center">
+                    <span class="text-xs font-bold">المجموع العام للفترة</span>
+                    <span class="font-extrabold text-amber-400 text-sm">${formatMoney(grandSum)}</span>
+                </div>
+            `;
+
+            const unified = [
+                ...govList.map(x => ({ date: x.month, cat: 'فاتورة حكومية', desc: `فاتورة رقم ${x.number} (${x.units} وحدة) ${x.notes ? '- ' + x.notes : ''}`, amount: x.total })),
+                ...tankerList.map(x => ({ date: x.date, cat: 'وايت مياه', desc: `${x.units} وحدة × ${x.unitPrice} ${x.notes ? '- ' + x.notes : ''}`, amount: x.total })),
+                ...servList.map(x => ({ date: x.date, cat: `خدمة: ${x.type}`, desc: x.notes, amount: x.amount }))
+            ];
+
+            const tbody = document.getElementById('table-general-ledger');
+            if (!unified.length) {
+                tbody.innerHTML = emptyRowHTML(4, 'لا توجد حركات مالية مسجلة في هذه الفترة');
+                return;
+            }
+
+            tbody.innerHTML = unified.map(row => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3">${row.date}</td>
+                    <td class="p-3 font-bold text-slate-700">${row.cat}</td>
+                    <td class="p-3 text-slate-600">${row.desc}</td>
+                    <td class="p-3 font-bold text-slate-900">${formatMoney(row.amount)}</td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * =========================================================================
+         * 4. SETTINGS, TIMEZONE CLOCK & BACKUP
+         * =========================================================================
+         */
+        function applySettingsToUI() {
+            document.getElementById('header-building-name').textContent = appState.settings.buildingName;
+            document.getElementById('header-currency-badge').textContent = appState.settings.currency;
+            document.getElementById('set-building-name').value = appState.settings.buildingName;
+            document.getElementById('set-currency').value = appState.settings.currency;
+            document.getElementById('set-timezone').value = appState.settings.timezone;
+            document.getElementById('set-timeformat').value = appState.settings.timeFormat;
+            document.getElementById('set-username').value = appState.auth.username;
+            updateClock();
+        }
+
+        function saveSystemSettings(e) {
+            e.preventDefault();
+            appState.settings.buildingName = document.getElementById('set-building-name').value.trim();
+            appState.settings.currency = document.getElementById('set-currency').value;
+            appState.settings.timezone = document.getElementById('set-timezone').value;
+            appState.settings.timeFormat = document.getElementById('set-timeformat').value;
+            saveState();
+            applySettingsToUI();
+            renderAllTables();
+            updateDashboard();
+            initPWA();
+            showToast('تم حفظ إعدادات النظام بنجاح', 'success');
+        }
+
+        function updateCredentials(e) {
+            e.preventDefault();
+            const newUser = document.getElementById('set-username').value.trim();
+            const newPass = document.getElementById('set-password').value;
+            if (!newUser || !newPass) return;
+
+            appState.auth.username = newUser;
+            appState.auth.password = newPass;
+            saveState();
+            document.getElementById('set-password').value = '';
+            showToast('تم تحديث اسم المستخدم وكلمة المرور بنجاح', 'success');
+        }
+
+        function updateClock() {
+            const clockEl = document.getElementById('live-clock');
+            if (!clockEl) return;
+            try {
+                const options = {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: appState.settings.timeFormat === '12'
+                };
+                if (appState.settings.timezone !== 'local') {
+                    options.timeZone = appState.settings.timezone;
+                }
+                clockEl.textContent = new Intl.DateTimeFormat('ar-SA', options).format(new Date());
+            } catch (e) {
+                clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+        }
+        setInterval(updateClock, 15000);
+
+        function exportBackupJSON() {
+            const dataStr = JSON.stringify(appState, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `water_billing_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('تم تصدير النسخة الاحتياطية بنجاح', 'success');
+        }
+
+        function importBackupJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (imported && imported.data && imported.settings) {
+                        appState = imported;
+                        saveState();
+                        applySettingsToUI();
+                        renderAllTables();
+                        updateDashboard();
+                        showToast('تم استعادة البيانات من النسخة الاحتياطية بنجاح', 'success');
+                    } else {
+                        showToast('ملف النسخة الاحتياطية غير صالح', 'error');
+                    }
+                } catch (err) {
+                    showToast('خطأ في قراءة الملف', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function confirmClearAllData() {
+            openModal(
+                'تحذير: تصفير كافة البيانات',
+                '<p class="text-rose-600 font-semibold">سيتم حذف جميع الفواتير، الوايتات، الخدمات، وبيانات المشتركين نهائياً والبدء من الصفر. هل أنت متأكد؟</p>',
+                `<button onclick="closeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
+                 <button onclick="executeClearAllData()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">تأكيد التصفير</button>`
+            );
+        }
+
+        function executeClearAllData() {
+            appState.data = { govBills: [], tankers: [], services: [], subscribers: [] };
+            saveState();
+            closeModal();
+            renderAllTables();
+            updateDashboard();
+            showToast('تم تصفير كافة البيانات بنجاح', 'info');
+        }
+
+        /**
+         * =========================================================================
+         * CUSTOM TOAST & MODAL SYSTEM (No browser alert/confirm)
+         * =========================================================================
+         */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const colors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                info: 'bg-slate-800 text-white'
+            };
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${colors[type] || colors.info} px-4 py-3 rounded-2xl shadow-lg text-xs font-bold flex items-center gap-2.5 transform transition-all duration-300 translate-y-0 opacity-100`;
+            toast.innerHTML = `<i class="fas ${icons[type] || icons.info} text-base"></i><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function openModal(title, bodyHTML, footerHTML) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').innerHTML = bodyHTML;
+            document.getElementById('modal-footer').innerHTML = footerHTML;
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        // Boot Application
+        window.addEventListener('DOMContentLoaded', () => {
+            initPWA();
+            initAuthUI();
+        });
+    </script>
+</body>
+</html>
